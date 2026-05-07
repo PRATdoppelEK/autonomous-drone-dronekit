@@ -1,153 +1,156 @@
-# Autonomous Drone Programming with DroneKit & Python
+# Autonomous Drone Control — DroneKit & Python
 
-A Python-based project for programming and controlling autonomous unmanned aerial vehicles (UAVs) using DroneKit and OpenCV. This project grew out of my Bachelor's thesis at Rajasthan Technical University, where I designed and analysed a Quadcopter (UAV) and a compressed-air vehicle (CRAVE). The hands-on engineering work sparked a deeper interest in autonomous flight systems — this repository documents that continued exploration.
+> MAVLink-based autonomous UAV control stack with real-time computer vision, GPS waypoint navigation, obstacle detection, and object tracking. Deployable on both SITL simulation and real hardware.
 
 ---
 
-## Project Overview
+## What This Is
 
-This project covers the full control lifecycle of an autonomous drone:
+A modular Python framework for programming autonomous UAV behaviour — from low-level MAVLink communication and flight control, through to real-time perception using OpenCV. The system covers the full mission lifecycle: connect → arm → take off → navigate → perceive → track → return safely.
 
-- Connecting to a drone (simulation or real hardware via MAVLink)
-- Arming, taking off, and landing autonomously
-- GPS-based waypoint navigation
-- Live camera feed integration
-- Real-time obstacle detection using computer vision
-- Object tracking with OpenCV
-- Safe return-to-launch (RTL) procedures
+Written to run on **both simulation (SITL/MAVProxy) and real hardware**, with a clean separation between flight control logic and perception modules.
 
-The code is written for both **simulation** (via MAVProxy / SITL) and **real hardware** deployment, making it easy to test safely before flying.
+---
+
+## Why It Exists
+
+My B.Tech. final year project at Rajasthan Technical University involved designing, structurally analysing, and test-flying a Quadcopter UAV — covering aerodynamics, frame design, motor sizing, and basic flight mechanics. That work gave me a solid hardware intuition for what autonomous systems need to do reliably in the real world.
+
+This repository is the software continuation of that: building the perception and control stack that turns a flying platform into an autonomous system. The combination of mechanical understanding and software control is exactly what matters when hardware has to work under real conditions.
+
+---
+
+## System Architecture
+
+```
+autonomous-drone-dronekit/
+│
+├── connection.py           # MAVLink connection, telemetry monitoring
+├── arm_takeoff.py          # Pre-arm safety checks, takeoff sequence
+├── navigation.py           # GPS waypoint navigation (simple_goto)
+├── camera_feed.py          # Live camera stream, frame capture
+├── obstacle_detection.py   # Edge-based obstacle detection (Canny/OpenCV)
+├── object_tracking.py      # Real-time MOSSE tracker — target lock
+├── return_to_launch.py     # RTL mode, auto-land, vehicle shutdown
+│
+├── examples/
+│   ├── full_mission.py     # End-to-end autonomous mission demo
+│   └── simulation_test.py  # SITL test script
+│
+├── docs/
+│   └── setup.md            # Hardware + simulation setup guide
+│
+└── requirements.txt
+```
 
 ---
 
 ## Tech Stack
 
-| Tool | Purpose |
-|------|---------|
-| Python 3.8+ | Primary language |
-| DroneKit | MAVLink-based drone communication & control |
-| OpenCV | Computer vision, camera feed, object tracking |
-| MAVProxy / SITL | Simulation environment |
-| NumPy | Image processing support |
+| Component | Tool |
+|-----------|------|
+| Language | Python 3.8+ |
+| Flight control / MAVLink | DroneKit |
+| Computer vision | OpenCV |
+| Simulation | DroneKit-SITL / MAVProxy / ArduCopter |
+| Telemetry protocol | MAVLink (UDP / USB / telemetry radio) |
+| Numerical processing | NumPy |
 
 ---
 
-## Project Structure
+## Core Modules
 
-```
-autonomous-drone-dronekit/
-│
-├── README.md
-├── requirements.txt
-│
-├── connection.py          # Connect to drone, read telemetry
-├── arm_takeoff.py         # Arm vehicle and execute takeoff sequence
-├── navigation.py          # GPS waypoint navigation
-├── camera_feed.py         # Live camera stream capture and image saving
-├── obstacle_detection.py  # Edge-based obstacle detection with OpenCV
-├── object_tracking.py     # Real-time object tracking (MOSSE tracker)
-├── return_to_launch.py    # RTL and auto-land procedures
-│
-├── examples/
-│   ├── full_mission.py    # Complete autonomous mission example
-│   └── simulation_test.py # SITL simulation test script
-│
-├── tests/
-│   └── test_navigation.py # Unit tests for navigation logic
-│
-└── docs/
-    └── setup.md           # Setup guide for simulation and hardware
-```
+### Connection & Telemetry — `connection.py`
+Establishes MAVLink link to vehicle (simulation or hardware). Streams GPS position, altitude, battery state, flight mode, and armed status in real time. Handles reconnection on link loss.
+
+### Arm & Takeoff — `arm_takeoff.py`
+Runs pre-arm safety checks (GPS fix, battery, mode), switches to GUIDED mode, arms motors, and climbs to target altitude with confirmation before proceeding. Altitude verified before handing off to navigation.
+
+### GPS Waypoint Navigation — `navigation.py`
+Navigates to absolute GPS coordinates at defined altitude using `simple_goto`. Monitors distance-to-target and triggers next waypoint or action on arrival. Supports sequential multi-waypoint missions.
+
+### Camera Feed — `camera_feed.py`
+Captures and displays live camera stream from onboard camera. Saves frames on demand. Foundation for onboard vision processing pipeline.
+
+### Obstacle Detection — `obstacle_detection.py`
+Applies OpenCV Canny edge detection to the live camera feed to identify obstacles in the flight path. Designed as a lightweight, real-time module suitable for embedded hardware.
+
+### Object Tracking — `object_tracking.py`
+MOSSE tracker for real-time target selection and lock-on. Operator selects target ROI; tracker maintains lock across frames. Foundation for intercept, follow-me, or target-designation applications.
+
+### Return to Launch — `return_to_launch.py`
+Triggers RTL mode and monitors descent to safe auto-land. Disarms vehicle and closes MAVLink connection cleanly after touchdown.
 
 ---
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+### Install dependencies
 
 ```bash
 pip install dronekit opencv-python numpy pymavlink
+pip install dronekit-sitl  # for simulation only
 ```
 
-For simulation (SITL):
-```bash
-pip install dronekit-sitl
-```
-
-### Run in Simulation
+### Run in SITL simulation
 
 ```bash
-# Start SITL simulation
-dronekit-sitl copter --home=47.397742,8.545594,584,353
+# Terminal 1 — start simulated ArduCopter
+dronekit-sitl copter --home=48.1351,11.5820,520,0  # Munich coordinates
 
-# In a separate terminal, run your script
+# Terminal 2 — run connection test
 python connection.py
 ```
 
-### Connect to Real Hardware
-
-Change the connection string in any script:
+### Deploy on real hardware
 
 ```python
-# Simulation
-vehicle = connect('127.0.0.1:14550', wait_ready=True)
-
-# Real drone via USB/telemetry
+# USB / telemetry radio
 vehicle = connect('/dev/ttyUSB0', baud=57600, wait_ready=True)
 
-# Real drone via UDP
+# UDP (companion computer / network link)
 vehicle = connect('udp:192.168.1.1:14550', wait_ready=True)
 ```
 
 ---
 
-## Features
+## Relevant Applications
 
-### 1. Connection & Telemetry
-Read GPS coordinates, battery level, flight mode, and system status in real time.
+This control stack is directly applicable to:
 
-### 2. Arm & Takeoff
-Automated safety checks before arming. Altitude confirmation before proceeding.
-
-### 3. GPS Waypoint Navigation
-Navigate to specific GPS coordinates at a defined altitude using `simple_goto`.
-
-### 4. Camera Integration
-Capture and display live drone camera feed. Save images on demand.
-
-### 5. Obstacle Detection
-Edge detection via OpenCV Canny algorithm to identify obstacles in camera feed.
-
-### 6. Object Tracking
-MOSSE tracker for real-time object selection and tracking. Foundation for follow-me or target-lock functionality.
-
-### 7. Return to Launch / Auto-Land
-Safe RTL mode and autonomous landing with vehicle shutdown.
+- **Autonomous interception missions** — GPS-guided approach, target tracking, RTL
+- **Counter-UAS systems** — perception pipeline for detecting and tracking airborne targets
+- **Payload delivery / inspection UAVs** — waypoint nav + camera + safe return
+- **Search and track** — MOSSE tracker adapted for airborne target lock
 
 ---
 
-## Background & Motivation
+## Background
 
-During my B.Tech. in Mechanical Engineering, I designed and tested a Quadcopter UAV as part of my final year project — covering aerodynamic analysis, structural design, and flight mechanics. That project showed me how much engineering goes into making something fly reliably.
+**B.Tech. Mechanical Engineering** — Rajasthan Technical University (2012–2016)
+Final year project: Design, structural analysis, and test flight of a Quadcopter UAV and compressed-air vehicle (CRAVE). Covered aerodynamic modelling, frame stress analysis, motor and ESC selection, and manual/autonomous flight testing.
 
-This repository is the software side of that interest: learning how to command, navigate, and give autonomous perception capabilities to a UAV using Python. It bridges mechanical understanding with software control — the same integration that matters in real-world autonomous systems.
+**M.Sc. Energy Engineering** — Technische Universität Berlin (2018–2021)
+Thesis: *Custom Battery Cell Balancing Circuit Design Under Thermal Gradient* — thermal simulation framework (CFD/HyperWorks), MATLAB-Simulink lifetime analysis. Relevant to battery-powered UAV endurance and thermal management.
 
 ---
 
-## Future Work
+## Roadmap
 
-- [ ] Integration with ArduPilot Mission Planner for complex mission planning
-- [ ] YOLO-based object detection for improved accuracy
-- [ ] Geofencing implementation
-- [ ] Multi-drone coordination (swarm basics)
-- [ ] ROS integration for advanced autonomy
+- [ ] YOLO-based object detection for improved target classification
+- [ ] Geofencing with automatic boundary enforcement
+- [ ] ArduPilot Mission Planner integration for complex mission upload
+- [ ] ROS2 integration for sensor fusion and advanced autonomy
+- [ ] Multi-drone coordination basics
 
 ---
 
 ## Author
 
-**Prateek Gaur**
-M.Sc. Energy Engineering – TU Berlin
-B.Tech. Mechanical Engineering – Rajasthan Technical University
+**Prateek Gaur** — Munich, Germany
 
-[Portfolio](https://prateek-gaur-ml-bz0s69q.gamma.site/) | [GitHub](https://github.com/PRATdoppelEK)
+M.Sc. Energy Engineering · TU Berlin | B.Tech. Mechanical Engineering · RTU
+
+Applied ML Engineer with background in UAV design, battery systems, and autonomous system development.
+
+[Portfolio](https://prateek-gaur-ml-bz0s69q.gamma.site/) | [LinkedIn](https://www.linkedin.com/in/prateek-gaur-15a629b4) | [GitHub](https://github.com/PRATdoppelEK)
