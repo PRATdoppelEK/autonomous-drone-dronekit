@@ -88,11 +88,11 @@ Triggers RTL mode and monitors descent to safe auto-land. Disarms vehicle and cl
 
 **Tab 1 — ArduCopter SITL running (Munich coordinates):**
 
-![SITL startup](assets/screenshots/sitl_startup.png)
+![SITL startup](screenshots/sitl_startup.png)
 
 **Tab 2 — DroneKit connected, live telemetry:**
 
-![Telemetry output](assets/screenshots/telemetry_output.png)
+![Telemetry output](screenshots/telemetry_output.png)
 
 **Telemetry snapshot — SITL simulation at 48.1351°N, 11.5820°E:**
 
